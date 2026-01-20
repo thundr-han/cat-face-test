@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AI面相测猫</title>
+    <!-- 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 React 和 ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- 引入 Babel 用于解析 JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        /* 自定义动画 */
+        @keyframes scan {
+            0% { top: 0%; opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { top: 100%; opacity: 0; }
+        }
+        .animate-scan {
+            animation: scan 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+            background: linear-gradient(to bottom, transparent, rgba(59, 130, 246, 0.5), #3B82F6);
+            box-shadow: 0 0 10px #3B82F6;
+        }
+        
+        @keyframes fade-in-up {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in-up {
+            animation: fade-in-up 0.5s ease-out forwards;
+        }
+        @keyframes wink {
+            0%, 90%, 100% { transform: scaleY(1); }
+            95% { transform: scaleY(0.1); }
+        }
+        .animate-wink {
+            animation: wink 4s infinite;
+            transform-origin: center;
+        }
+        
+        body {
+            -webkit-tap-highlight-color: transparent;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+        
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useRef } = React;
+
+        // --- 图标组件 ---
+        const Icons = {
+            Sparkles: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L12 3Z"/></svg>,
+            RefreshCw: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>,
+            Share2: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" x2="15.42" y1="13.51" y2="17.49"/><line x1="15.41" x2="8.59" y1="6.51" y2="10.49"/></svg>,
+            Camera: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>,
+            Upload: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+        };
+
+        // --- 猫咪 SVG ---
+        const CatAvatar = ({ type }) => {
+            const configs = {
+                orange: { body: '#FDBA74', earDark: '#FB923C', eye: '#374151', stripe: '#EA580C' },
+                ragdoll: { body: '#F3F4F6', earDark: '#94A3B8', eye: '#3B82F6', mask: '#E2E8F0' },
+                black: { body: '#1F2937', earDark: '#111827', eye: '#FACC15' },
+                tuxedo: { body: '#111827', earDark: '#030712', eye: '#374151', patch: '#FFFFFF' },
+                british: { body: '#94A3B8', earDark: '#64748B', eye: '#EA580C' },
+                calico: { body: '#FFFFFF', earDark: '#1F2937', eye: '#374151', spots: true },
+            };
+            const cfg = configs[type] || configs.orange;
+
+            return (
+                <svg viewBox="0 0 200 200" className="w-full h-full transform transition-transform hover:scale-105 duration-500">
+                    <defs><clipPath id="circleClip"><circle cx="100" cy="100" r="95" /></clipPath></defs>
+                    <circle cx="100" cy="100" r="100" fill={type === 'black' || type === 'tuxedo' ? '#E5E7EB' : '#FFF7ED'} />
+                    <g clipPath="url(#circleClip)">
+                        <circle cx="100" cy="130" r="70" fill={cfg.body} />
+                        <path d="M35 60 L60 20 L85 60 Z" fill={cfg.body} />
+                        <path d="M165 60 L140 20 L115 60 Z" fill={cfg.body} />
+                        <path d="M45 55 L60 30 L75 55 Z" fill={cfg.earDark} opacity="0.6" />
+                        <path d="M155 55 L140 30 L125 55 Z" fill={cfg.earDark} opacity="0.6" />
+                        {type === 'orange' && <g fill={cfg.stripe} opacity="0.6"><path d="M100 55 L90 75 L110 75 Z" /><path d="M100 45 L80 65 L120 65 Z" /></g>}
+                        {type === 'ragdoll' && <path d="M50 130 C 50 80, 150 80, 150 130 L 140 130 C 140 100, 60 100, 60 130 Z" fill={cfg.earDark} opacity="0.3" />}
+                        {type === 'tuxedo' && <path d="M90 120 L110 120 L100 160 Z" fill={cfg.patch} />}
+                        {type === 'calico' && <g><circle cx="50" cy="80" r="15" fill="#FB923C" /><circle cx="150" cy="90" r="12" fill="#1F2937" /><circle cx="100" cy="60" r="10" fill="#FB923C" /></g>}
+                        <g className="animate-wink">
+                            <circle cx="70" cy="110" r="10" fill={cfg.eye} /><circle cx="130" cy="110" r="10" fill={cfg.eye} />
+                            <circle cx="73" cy="107" r="3" fill="white" /><circle cx="133" cy="107" r="3" fill="white" />
+                        </g>
+                        <path d="M95 125 L105 125 L100 132 Z" fill="#F472B6" />
+                        <path d="M100 132 Q90 145 80 140" fill="none" stroke={type === 'black' || type === 'tuxedo' ? '#E5E7EB' : '#374151'} strokeWidth="2" strokeLinecap="round" />
+                        <path d="M100 132 Q110 145 120 140" fill="none" stroke={type === 'black' || type === 'tuxedo' ? '#E5E7EB' : '#374151'} strokeWidth="2" strokeLinecap="round" />
+                    </g>
+                </svg>
+            );
+        };
+
+        const CatQuizApp = () => {
+            const [step, setStep] = useState('intro'); // intro, scanning, result
+            const [result, setResult] = useState(null);
+            const [userImage, setUserImage] = useState(null);
+            const fileInputRef = useRef(null);
+
+            const catTypes = [
+                { id: 'orange', name: '大橘为重', title: '乐天派干饭王', desc: '根据面部轮廓分析，你天庭饱满，很有口福。眼神中透露出的对生活的热爱，像极了那个心中只有小鱼干的大橘。', tags: ['吃货', '社牛'], color: 'from-orange-400 to-yellow-300', textColor: 'text-orange-600' },
+                { id: 'ragdoll', name: '布偶猫', title: '人间富贵花', desc: '你的五官线条柔和，眼神清澈，透着一股与生俱来的优雅气质。这种温柔而治愈的氛围，简直就是布偶猫本猫。', tags: ['颜值担当', '温柔'], color: 'from-blue-300 to-purple-300', textColor: 'text-blue-600' },
+                { id: 'black', name: '黑猫', title: '暗夜酷盖', desc: '眉宇间透着一股英气，眼神深邃而机敏。你给人一种神秘的吸引力，就像黑猫一样，只有懂你的人才知道你的独特魅力。', tags: ['神秘', '酷'], color: 'from-gray-700 to-gray-900', textColor: 'text-gray-800' },
+                { id: 'tuxedo', name: '奶牛猫', title: '猫界哈士奇', desc: '你的表情生动丰富，嘴角常带笑意，甚至有一丝丝调皮。检测到你的脑电波异常活跃，这种不按常理出牌的气质非奶牛猫莫属！', tags: ['神经刀', '有趣'], color: 'from-gray-800 to-white', textColor: 'text-gray-900' },
+                { id: 'british', name: '英短蓝猫', title: '稳重绅士', desc: '面相圆润敦厚，眼神沉稳。你给人的第一印象就是“靠谱”，像英短一样稳重，是朋友们最值得信赖的伙伴。', tags: ['稳重', '可靠'], color: 'from-slate-400 to-slate-600', textColor: 'text-slate-700' },
+                { id: 'calico', name: '三花猫', title: '欧皇附体', desc: '面容清秀，自成一派。你的眼中闪烁着独特的光芒，既有主见又充满灵气。作为幸运的象征，你总能给身边的人带来好运。', tags: ['幸运', '独立'], color: 'from-orange-300 to-gray-400', textColor: 'text-orange-700' }
+            ];
+
+            // 简单的字符串哈希函数，用于根据图片数据生成固定结果
+            const simpleHash = (str) => {
+                let hash = 0;
+                for (let i = 0; i < str.length; i++) {
+                    const char = str.charCodeAt(i);
+                    hash = ((hash << 5) - hash) + char;
+                    hash = hash & hash;
+                }
+                return Math.abs(hash);
+            };
+
+            const handleFileSelect = (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        const imgData = event.target.result;
+                        setUserImage(imgData);
+                        setStep('scanning');
+                        
+                        // 开始"分析"
+                        setTimeout(() => {
+                            // 使用图片数据的哈希值来决定猫咪类型，保证同一张照片结果一致
+                            const hash = simpleHash(imgData.substring(0, 1000)); // 取前1000字符做哈希即可
+                            const catIndex = hash % catTypes.length;
+                            setResult(catTypes[catIndex]);
+                            setStep('result');
+                        }, 2500);
+                    };
+                    reader.readAsDataURL(file);
+                }
+            };
+
+            const triggerInput = () => fileInputRef.current.click();
+            const reset = () => {
+                setStep('intro');
+                setResult(null);
+                setUserImage(null);
+            };
+
+            const handleShare = () => {
+                if (!result) return;
+                const shareText = `📸 面容识别对比完成！\n经过AI分析，我的面相竟然和【${result.name}】匹配度高达99.9%！\n"${result.title}" - ${result.desc}\n#AI测猫 #面相测试`;
+                const textArea = document.createElement("textarea");
+                textArea.value = shareText;
+                document.body.appendChild(textArea);
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    alert("✅ 结果已复制！快去发给朋友看看吧~");
+                } catch (err) { alert("❌ 复制失败，请手动截图"); }
+                document.body.removeChild(textArea);
+            };
+
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-purple-100 to-pink-100 flex items-center justify-center p-4">
+                    <div className="max-w-md w-full bg-white/90 backdrop-blur-xl rounded-3xl shadow-2xl overflow-hidden border border-white/60 relative">
+                        
+                        {/* 顶部装饰 */}
+                        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500"></div>
+
+                        <div className="relative z-10 p-6 max-h-[90vh] overflow-y-auto no-scrollbar">
+                            {/* 标题 */}
+                            <div className="text-center mb-6">
+                                <h1 className="text-2xl font-black text-gray-800 tracking-tight flex items-center justify-center gap-2">
+                                    <Icons.Camera /> 面容识别测猫
+                                </h1>
+                                <p className="text-gray-500 mt-2 text-xs">
+                                    上传照片或自拍，AI 解析你的猫系基因
+                                </p>
+                            </div>
+
+                            {/* 隐藏的文件输入 */}
+                            <input 
+                                type="file" 
+                                ref={fileInputRef} 
+                                onChange={handleFileSelect} 
+                                accept="image/*" 
+                                className="hidden" 
+                            />
+
+                            {/* 内容区域 */}
+                            <div className="bg-white rounded-2xl shadow-inner border border-gray-100 overflow-hidden min-h-[320px] flex flex-col items-center justify-center relative">
+                                
+                                {/* 阶段1：上传/引导 */}
+                                {step === 'intro' && (
+                                    <div className="text-center p-8 space-y-6 animate-fade-in-up w-full">
+                                        <div 
+                                            onClick={triggerInput}
+                                            className="w-40 h-40 mx-auto border-4 border-dashed border-gray-300 rounded-full flex flex-col items-center justify-center text-gray-400 cursor-pointer hover:border-blue-400 hover:text-blue-500 transition-colors bg-gray-50 group"
+                                        >
+                                            <div className="group-hover:scale-110 transition-transform duration-300">
+                                                <Icons.Upload />
+                                            </div>
+                                            <span className="text-xs mt-2 font-medium">点击上传/拍摄</span>
+                                        </div>
+                                        <p className="text-gray-400 text-xs px-4">
+                                            我们将分析你的五官比例、表情神态<br/>来匹配最契合的猫咪
+                                        </p>
+                                    </div>
+                                )}
+
+                                {/* 阶段2：扫描分析中 */}
+                                {step === 'scanning' && userImage && (
+                                    <div className="relative w-full h-full min-h-[320px] bg-black flex flex-col items-center justify-center overflow-hidden">
+                                        {/* 用户上传的图片背景 */}
+                                        <img src={userImage} className="absolute inset-0 w-full h-full object-cover opacity-60 blur-sm" />
+                                        
+                                        {/* 中间清晰的扫描区 */}
+                                        <div className="relative w-48 h-48 rounded-2xl overflow-hidden border-2 border-blue-400/50 shadow-[0_0_20px_rgba(59,130,246,0.3)] z-10 bg-black/20 backdrop-blur-none">
+                                            <img src={userImage} className="w-full h-full object-cover" />
+                                            {/* 扫描线动画 */}
+                                            <div className="absolute left-0 right-0 h-1 bg-blue-400 animate-scan z-20"></div>
+                                            
+                                            {/* 科技感装饰点 */}
+                                            <div className="absolute top-2 left-2 w-2 h-2 border-t-2 border-l-2 border-blue-500"></div>
+                                            <div className="absolute top-2 right-2 w-2 h-2 border-t-2 border-r-2 border-blue-500"></div>
+                                            <div className="absolute bottom-2 left-2 w-2 h-2 border-b-2 border-l-2 border-blue-500"></div>
+                                            <div className="absolute bottom-2 right-2 w-2 h-2 border-b-2 border-r-2 border-blue-500"></div>
+                                        </div>
+
+                                        <div className="absolute bottom-10 z-20 text-blue-100 font-mono text-sm animate-pulse flex flex-col items-center gap-1">
+                                            <span>正在提取面部特征点...</span>
+                                            <span className="text-xs opacity-70">Matching DNA sequence...</span>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* 阶段3：结果对比 */}
+                                {step === 'result' && result && userImage && (
+                                    <div className="w-full h-full flex flex-col animate-fade-in-up">
+                                        {/* 对比展示区 */}
+                                        <div className="flex h-48 w-full border-b border-gray-100">
+                                            {/* 左边：人 */}
+                                            <div className="w-1/2 relative overflow-hidden bg-gray-100">
+                                                <img src={userImage} className="w-full h-full object-cover" />
+                                                <div className="absolute bottom-2 left-2 bg-black/60 text-white text-[10px] px-2 py-0.5 rounded backdrop-blur-sm">
+                                                    YOU
+                                                </div>
+                                            </div>
+                                            {/* 中间：连接符 */}
+                                            <div className="absolute left-1/2 top-24 -translate-x-1/2 -translate-y-1/2 z-20 bg-white rounded-full p-1 shadow-lg">
+                                                <div className="bg-gradient-to-r from-blue-500 to-purple-500 text-white text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full">
+                                                    VS
+                                                </div>
+                                            </div>
+                                            {/* 右边：猫 */}
+                                            <div className={`w-1/2 relative overflow-hidden bg-gradient-to-br ${result.color.replace('from-', 'from-white/50 to-')}`}>
+                                                <div className="w-full h-full p-4 flex items-center justify-center">
+                                                    <CatAvatar type={result.id} />
+                                                </div>
+                                                <div className="absolute bottom-2 right-2 bg-black/60 text-white text-[10px] px-2 py-0.5 rounded backdrop-blur-sm">
+                                                    CAT
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* 文字描述 */}
+                                        <div className="p-5 text-center bg-white flex-1 flex flex-col justify-center">
+                                            <div className="flex justify-center items-center gap-2 mb-2">
+                                                <span className="text-xs text-gray-400">匹配度 99.9%</span>
+                                                <div className={`text-xs px-2 py-0.5 rounded-full bg-opacity-10 ${result.textColor.replace('text-', 'bg-')} ${result.textColor}`}>
+                                                    {result.title}
+                                                </div>
+                                            </div>
+                                            
+                                            <h2 className={`text-2xl font-bold mb-3 ${result.textColor}`}>
+                                                {result.name}
+                                            </h2>
+                                            
+                                            <div className="flex justify-center gap-2 mb-3">
+                                                {result.tags.map(tag => (
+                                                    <span key={tag} className="bg-gray-100 text-gray-500 text-[10px] px-2 py-1 rounded">#{tag}</span>
+                                                ))}
+                                            </div>
+
+                                            <p className="text-gray-600 text-xs leading-relaxed text-justify px-2">
+                                                {result.desc}
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* 底部按钮 */}
+                            <div className="mt-6">
+                                {step === 'intro' ? (
+                                    <button
+                                        onClick={triggerInput}
+                                        className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold py-4 px-6 rounded-2xl shadow-lg shadow-blue-200 transform active:scale-95 transition-all flex items-center justify-center gap-2"
+                                    >
+                                        <Icons.Camera /> 开始面部扫描
+                                    </button>
+                                ) : step === 'result' ? (
+                                    <div className="flex gap-3">
+                                        <button
+                                            onClick={reset}
+                                            className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-3 px-4 rounded-xl transition-colors flex items-center justify-center gap-2 active:scale-95"
+                                        >
+                                            <Icons.RefreshCw /> 换张照片
+                                        </button>
+                                        <button
+                                            className="flex-1 bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-bold py-3 px-4 rounded-xl shadow-md active:scale-95 transition-all flex items-center justify-center gap-2"
+                                            onClick={handleShare}
+                                        >
+                                            <Icons.Share2 /> 分享结果
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <button disabled className="w-full bg-gray-100 text-gray-400 font-bold py-4 rounded-2xl cursor-wait flex items-center justify-center gap-2">
+                                        <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></span>
+                                        <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100"></span>
+                                        <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200"></span>
+                                    </button>
+                                )}
+                                
+                                <p className="text-center text-[10px] text-gray-400 mt-4">
+                                    照片仅在本地处理，不会上传服务器
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<CatQuizApp />);
+    </script>
+</body>
+</html>
